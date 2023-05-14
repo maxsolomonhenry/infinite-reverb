@@ -1,10 +1,10 @@
+from abc import ABC, abstractmethod
 import numpy as np
 
-class OlaBuffer():
-    def __init__(self, frame_size, num_overlap, processor):
+class OlaBuffer(ABC):
+    def __init__(self, frame_size, num_overlap):
         self._frame_size = frame_size
         self._num_overlap = num_overlap
-        self._processor = processor
 
         self._hop_size = int(np.ceil(frame_size / num_overlap))
 
@@ -30,9 +30,8 @@ class OlaBuffer():
 
         is_new_hop = (self._p_delay % self._hop_size == 0)
         if is_new_hop:
-            self._frame_buffers[:, self._p_newest_frame] = self._fill_from_delay_buffer()
             self._frame_buffers[:, self._p_newest_frame] = self._processor(
-                self._frame_buffers[:, self._p_newest_frame]
+                self._fill_from_delay_buffer()
             )
             self._fill_add_buffer()
             self._p_newest_frame = (self._p_newest_frame + 1) % self._num_overlap
@@ -43,6 +42,10 @@ class OlaBuffer():
         self._p_add = (self._p_add + 1) % self._hop_size
 
         return x
+    
+    @abstractmethod
+    def _processor(self, frame):
+        pass
 
     def _fill_add_buffer(self):
         self._add_buffer *= 0
