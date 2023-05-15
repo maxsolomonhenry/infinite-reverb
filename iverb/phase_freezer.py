@@ -20,6 +20,7 @@ class PhaseFreezer(OlaBuffer):
 
     def request_freeze(self):
         self._do_grab_frame_one = True
+        self._do_grab_frame_two = False
 
     def request_unfreeze(self):
         self._do_freeze = False
@@ -28,17 +29,17 @@ class PhaseFreezer(OlaBuffer):
 
         frame *= self._window
 
-        if self._do_grab_frame_one:
-            self._fft_buffer[:, 0] = np.fft.rfft(frame)
-            self._do_grab_frame_one = False
-            self._do_grab_frame_two = True
-
         if self._do_grab_frame_two:
             self._fft_buffer[:, 1] = np.fft.rfft(frame)
             self._do_grab_frame_two = False
 
             self._init_freeze()
             self._do_freeze = True
+            
+        if self._do_grab_frame_one:
+            self._fft_buffer[:, 0] = np.fft.rfft(frame)
+            self._do_grab_frame_one = False
+            self._do_grab_frame_two = True
 
         if self._do_freeze:
             self._phase += self._delta_phase
