@@ -1,9 +1,10 @@
 import numpy as np
 from .ola_buffer import OlaBuffer
+from .util import db_to_mag, mag_to_db, rms
 
 class PhaseFreezer(OlaBuffer):
 
-    def __init__(self, frame_size, num_overlap):
+    def __init__(self, frame_size, num_overlap, threshold_db):
         super().__init__(frame_size, num_overlap)
         self._window = np.hamming(frame_size)
 
@@ -18,14 +19,29 @@ class PhaseFreezer(OlaBuffer):
         self._delta_phase = np.zeros(hN)
         self._phase = np.zeros(hN)
 
+        self._threshold = db_to_mag(threshold_db)
+
     def request_freeze(self):
+        self._request_freeze()
+
+    def request_unfreeze(self):
+        self._request_unfreeze()
+
+    def set_threshold_db(self, x):
+        self._threshold = db_to_mag(x)
+
+    def _request_freeze(self):
         self._do_grab_frame_one = True
         self._do_grab_frame_two = False
 
-    def request_unfreeze(self):
+    def _request_unfreeze(self):
         self._do_freeze = False
 
     def _processor(self, frame):
+
+        # print(f"RMS:\t{mag_to_db(rms(frame)):.2f}dB")
+        if rms(frame) >= self._threshold:
+            self._request_freeze()
 
         frame *= self._window
 
@@ -57,4 +73,3 @@ class PhaseFreezer(OlaBuffer):
         self._delta_phase = (two - one) % (2 * np.pi)
 
         self._phase = two
-    
