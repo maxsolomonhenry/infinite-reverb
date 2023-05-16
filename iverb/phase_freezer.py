@@ -4,7 +4,7 @@ from .util import db_to_mag, mag_to_db, rms
 
 class PhaseFreezer(OlaBuffer):
 
-    NUM_RAMP_SAMPLES = 5e5
+    NUM_RAMP_SAMPLES = 5e6
 
     def __init__(self, frame_size, num_overlap, threshold_db, decay_seconds, sr):
         super().__init__(frame_size, num_overlap)
@@ -14,8 +14,7 @@ class PhaseFreezer(OlaBuffer):
         self._window = self._make_normalized_window(frame_size)
 
         self._do_freeze = False
-        self._do_grab_frame_one = False
-        self._do_grab_frame_two = False
+        self._do_reset_next_frame = False
 
         hN = frame_size // 2 + 1
         self._fft_buffer = np.zeros([hN, 2], dtype=complex)
@@ -28,21 +27,8 @@ class PhaseFreezer(OlaBuffer):
         self._decay_ramp = self._make_decay_ramp(decay_seconds)
         self._p_decay = 0
 
-    def request_freeze(self):
-        self._request_freeze()
-
-    def request_unfreeze(self):
-        self._request_unfreeze()
-
     def set_threshold_db(self, x):
         self._threshold = db_to_mag(x)
-
-    def _request_freeze(self):
-        self._do_grab_frame_one = True
-        self._do_grab_frame_two = False
-
-    def _request_unfreeze(self):
-        self._do_freeze = False
 
     def _make_decay_ramp(self, decay_seconds):
         # See thee mighty JOS:
@@ -64,22 +50,15 @@ class PhaseFreezer(OlaBuffer):
 
     def _processor(self, frame):
 
+        if self._do_reset_next_frame:
+            self._p_decay = 0
+            self._do_reset_next_frame = False
+
         # print(f"RMS:\t{mag_to_db(rms(frame)):.2f}dB")
         if rms(frame) >= self._threshold:
-            self._request_freeze()
-            self._p_decay = 0
-
-        if self._do_grab_frame_two:
-            self._fft_buffer[:, 1] = np.fft.rfft(frame)
-            self._do_grab_frame_two = False
-
-            self._init_freeze()
             self._do_freeze = True
-            
-        if self._do_grab_frame_one:
-            self._fft_buffer[:, 0] = np.fft.rfft(frame)
-            self._do_grab_frame_one = False
-            self._do_grab_frame_two = True
+            self._init_freeze()
+            self._do_reset_next_frame = True
 
         if self._do_freeze:
             self._phase += self._delta_phase
@@ -101,6 +80,15 @@ class PhaseFreezer(OlaBuffer):
         return x
 
     def _init_freeze(self):
+
+        p_previous_frame = (self._p_newest_frame - 1) % self._num_overlap
+
+        frame = self._clean_frame_buffers[:, self._p_newest_frame]
+        last_frame = self._clean_frame_buffers[:, p_previous_frame]
+
+        self._fft_buffer[:, 0] = np.fft.rfft(last_frame)
+        self._fft_buffer[:, 1] = np.fft.rfft(frame)
+
         self._magnitude = np.abs(self._fft_buffer[:, 1])
 
         one = np.angle(self._fft_buffer[:, 0])
