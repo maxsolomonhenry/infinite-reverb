@@ -4,9 +4,14 @@ from .util import db_to_mag, mag_to_db, rms
 
 class PhaseFreezer(OlaBuffer):
 
-    def __init__(self, frame_size, num_overlap, threshold_db):
+    NUM_RAMP_SAMPLES = 5e5
+
+    def __init__(self, frame_size, num_overlap, threshold_db, decay_seconds, sr):
         super().__init__(frame_size, num_overlap)
-        self._window = np.hamming(frame_size)
+
+        self._sr = sr
+
+        self._window = self._make_normalized_window(frame_size)
 
         self._do_freeze = False
         self._do_grab_frame_one = False
@@ -20,6 +25,8 @@ class PhaseFreezer(OlaBuffer):
         self._phase = np.zeros(hN)
 
         self._threshold = db_to_mag(threshold_db)
+        self._decay_ramp = self._make_decay_ramp(decay_seconds)
+        self._p_decay = 0
 
     def request_freeze(self):
         self._request_freeze()
@@ -37,13 +44,30 @@ class PhaseFreezer(OlaBuffer):
     def _request_unfreeze(self):
         self._do_freeze = False
 
+    def _make_decay_ramp(self, decay_seconds):
+        # See thee mighty JOS:
+        # https://ccrma.stanford.edu/~jos/st/Audio_Decay_Time_T60.html
+
+        tau = decay_seconds / 6.91
+
+        time = np.arange(self.NUM_RAMP_SAMPLES) / self._sr
+        return np.exp(- time / tau)
+
+    def _make_normalized_window(self, frame_size):
+        window = np.hamming(frame_size)
+
+        normalization = 0
+        for n in range(0, frame_size, self._hop_size):
+            normalization += window[n]
+
+        return window / normalization
+
     def _processor(self, frame):
 
         # print(f"RMS:\t{mag_to_db(rms(frame)):.2f}dB")
         if rms(frame) >= self._threshold:
             self._request_freeze()
-
-        frame *= self._window
+            self._p_decay = 0
 
         if self._do_grab_frame_two:
             self._fft_buffer[:, 1] = np.fft.rfft(frame)
@@ -61,10 +85,21 @@ class PhaseFreezer(OlaBuffer):
             self._phase += self._delta_phase
             frame = self._magnitude * np.exp(1j * self._phase)
             frame = np.fft.irfft(frame)
-            frame *= self._window
+
+        frame *= self._window
 
         return frame
     
+    def _post_processor(self, x):
+
+        x *= self._decay_ramp[self._p_decay]
+
+        if self._do_freeze:
+            self._p_decay = min(self._p_decay + 1, self.NUM_RAMP_SAMPLES)
+            x += self._dry_x
+
+        return x
+
     def _init_freeze(self):
         self._magnitude = np.abs(self._fft_buffer[:, 1])
 

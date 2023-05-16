@@ -16,6 +16,8 @@ class OlaBuffer(ABC):
         self._p_add = 0
         self._p_newest_frame = 0
 
+        self._dry_x = 0
+
     def process_block(self, block):
         
         num_samples = len(block)
@@ -26,6 +28,7 @@ class OlaBuffer(ABC):
         return block
 
     def process(self, x):
+        self._dry_x = self._delay_buffer[self._p_delay]
         self._delay_buffer[self._p_delay] = x
 
         is_new_hop = (self._p_delay % self._hop_size == 0)
@@ -41,10 +44,16 @@ class OlaBuffer(ABC):
         self._p_delay = (self._p_delay + 1) % self._frame_size
         self._p_add = (self._p_add + 1) % self._hop_size
 
+        x = self._post_processor(x)
+
         return x
     
     @abstractmethod
     def _processor(self, frame):
+        pass
+
+    @abstractmethod
+    def _post_processor(self, x):
         pass
 
     def _fill_add_buffer(self):
