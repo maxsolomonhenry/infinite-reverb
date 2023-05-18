@@ -35,12 +35,12 @@ class OlaBuffer(ABC):
         is_new_hop = (self._p_delay % self._hop_size == 0)
         if is_new_hop:
 
-            self._clean_frame_buffers[:, self._p_newest_frame] = self._fill_from_delay_buffer()
+            frame = self._fill_from_delay_buffer()
 
-            self._frame_buffers[:, self._p_newest_frame] = self._processor(
-                self._fill_from_delay_buffer()
-            )
+            self._clean_frame_buffers[:, self._p_newest_frame] = frame
+            self._frame_buffers[:, self._p_newest_frame] = self._processor(frame)
             self._fill_add_buffer()
+
             self._p_newest_frame = (self._p_newest_frame + 1) % self._num_overlap
 
         x = self._add_buffer[self._p_add]
