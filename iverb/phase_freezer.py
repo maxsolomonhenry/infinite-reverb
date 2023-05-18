@@ -6,7 +6,7 @@ class PhaseFreezer(OlaBuffer):
 
     NUM_RAMP_SAMPLES = 5e6
 
-    def __init__(self, frame_size, num_overlap, threshold_db, decay_seconds, sr):
+    def __init__(self, frame_size, num_overlap, threshold_db, decay_seconds, bend_amount, sr):
         super().__init__(frame_size, num_overlap)
 
         self._sr = sr
@@ -21,10 +21,16 @@ class PhaseFreezer(OlaBuffer):
         self._magnitude = np.zeros(hN)
         self._delta_phase = np.zeros(hN)
         self._phase = np.zeros(hN)
+        
+        self._phase_offset = np.arange(hN) / frame_size * (2 * np.pi)
+        self._bend_amount = bend_amount
 
         self._threshold = db_to_mag(threshold_db)
         self._decay_ramp = self._make_decay_ramp(decay_seconds)
         self._p_decay = 0
+
+        self._rms_alpha = 1.0 / (2 * frame_size)
+        self._envelope = 0
 
     def set_threshold_db(self, x):
         self._threshold = db_to_mag(x)
@@ -52,16 +58,26 @@ class PhaseFreezer(OlaBuffer):
             normalization += window[n]
 
         return window / normalization
+    
+    def _pre_processor(self, x):
+        
+        # Pseudo moving average for amplitude envelope.
+        self._envelope = self._rms_alpha * np.abs(x) + (1 - self._rms_alpha) * self._envelope
+
+        return x
 
     def _processor(self, frame):
 
-        if rms(frame) >= self._threshold:
+        if self._envelope >= self._threshold:
             self._do_freeze = True
             self._p_decay = 0
             self._init_freeze()
 
         if self._do_freeze:
             self._phase += self._delta_phase
+
+            self._delta_phase += (self._phase_offset * self._bend_amount)
+
             frame = self._magnitude * np.exp(1j * self._phase)
             frame = np.fft.irfft(frame)
 
@@ -94,6 +110,7 @@ class PhaseFreezer(OlaBuffer):
 
         one = np.angle(self._fft_buffer[:, 0])
         two = np.angle(self._fft_buffer[:, 1])
+
         self._delta_phase = (two - one) % (2 * np.pi)
 
         self._phase = two

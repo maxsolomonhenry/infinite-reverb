@@ -29,6 +29,9 @@ class OlaBuffer(ABC):
         return block
 
     def process(self, x):
+
+        x = self._pre_processor(x)
+
         self._dry_x = self._delay_buffer[self._p_delay]
         self._delay_buffer[self._p_delay] = x
 
@@ -54,6 +57,10 @@ class OlaBuffer(ABC):
     
     @abstractmethod
     def _processor(self, frame):
+        pass
+
+    @abstractmethod
+    def _pre_processor(self, x):
         pass
 
     @abstractmethod
