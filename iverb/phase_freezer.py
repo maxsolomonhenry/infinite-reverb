@@ -37,7 +37,13 @@ class PhaseFreezer(OlaBuffer):
         tau = decay_seconds / 6.91
 
         time = np.arange(self.NUM_RAMP_SAMPLES) / self._sr
-        return np.exp(- time / tau)
+        ramp = np.exp(- time / tau)
+
+        hN = self._frame_size // 2 + 1
+        window = np.hamming(self._frame_size)
+        ramp[:hN] *= window[:hN]
+        
+        return ramp
 
     def _make_normalized_window(self, frame_size):
         window = np.hamming(frame_size)
@@ -75,7 +81,8 @@ class PhaseFreezer(OlaBuffer):
 
         if self._do_freeze:
             self._p_decay = min(self._p_decay + 1, self.NUM_RAMP_SAMPLES)
-            x += self._dry_x
+            
+        x += self._dry_x
 
         return x
 
