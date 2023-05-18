@@ -14,7 +14,6 @@ class PhaseFreezer(OlaBuffer):
         self._window = self._make_normalized_window(frame_size)
 
         self._do_freeze = False
-        self._do_reset_next_frame = False
 
         hN = frame_size // 2 + 1
         self._fft_buffer = np.zeros([hN, 2], dtype=complex)
@@ -56,15 +55,10 @@ class PhaseFreezer(OlaBuffer):
 
     def _processor(self, frame):
 
-        if self._do_reset_next_frame:
-            self._p_decay = 0
-            self._do_reset_next_frame = False
-
-        # print(f"RMS:\t{mag_to_db(rms(frame)):.2f}dB")
         if rms(frame) >= self._threshold:
             self._do_freeze = True
+            self._p_decay = 0
             self._init_freeze()
-            self._do_reset_next_frame = True
 
         if self._do_freeze:
             self._phase += self._delta_phase
