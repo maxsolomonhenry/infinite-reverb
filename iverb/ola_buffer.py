@@ -11,7 +11,6 @@ class OlaBuffer(ABC):
         self._delay_buffer = np.zeros(frame_size)
         self._add_buffer = np.zeros(self._hop_size)
         self._frame_buffers = np.zeros((self._frame_size, num_overlap))
-        self._clean_frame_buffers = np.zeros((self._frame_size, num_overlap))
 
         self._p_delay = 0
         self._p_add = 0
@@ -40,7 +39,6 @@ class OlaBuffer(ABC):
 
             frame = self._fill_from_delay_buffer()
 
-            self._clean_frame_buffers[:, self._p_newest_frame] = frame
             self._frame_buffers[:, self._p_newest_frame] = self._processor(frame)
             self._fill_add_buffer()
 
