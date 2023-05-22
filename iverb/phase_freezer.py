@@ -32,6 +32,8 @@ class PhaseFreezer(OlaBuffer):
         self._rms_alpha = 1.0 / (2 * frame_size)
         self._envelope = 0
 
+        self._clean_frame_buffers = np.zeros(self._frame_buffers.shape)
+
     def set_threshold_db(self, x):
         self._threshold = db_to_mag(x)
 
@@ -67,6 +69,8 @@ class PhaseFreezer(OlaBuffer):
         return x
 
     def _processor(self, frame):
+
+        self._clean_frame_buffers[:, self._p_newest_frame] = frame
 
         if self._envelope >= self._threshold:
             self._do_freeze = True
