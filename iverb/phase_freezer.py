@@ -75,8 +75,13 @@ class PhaseFreezer(OlaBuffer):
 
         if self._do_freeze:
             self._phase += self._delta_phase
-
             self._delta_phase += (self._phase_offset * self._bend_amount)
+
+            # Slowly morph magnitude.
+            MAG_ALPHA = 0.01
+            fft_buffer = np.fft.rfft(frame)
+            new_magnitude = np.abs(fft_buffer)
+            self._magnitude = MAG_ALPHA * new_magnitude + (1 - MAG_ALPHA) * self._magnitude
 
             frame = self._magnitude * np.exp(1j * self._phase)
             frame = np.fft.irfft(frame)
@@ -92,7 +97,7 @@ class PhaseFreezer(OlaBuffer):
         if self._do_freeze:
             self._p_decay = min(self._p_decay + 1, self.NUM_RAMP_SAMPLES)
             
-        x += self._dry_x
+        # x += self._dry_x
 
         return x
 
