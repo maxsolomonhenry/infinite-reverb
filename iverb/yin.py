@@ -5,8 +5,6 @@ class Yin():
     LOW_PITCH_HZ = 50
     HIGH_PITCH_HZ = 600
 
-    THRESHOLD = 0.15
-
     def __init__(self, window_size, sr):
         self._window_size = window_size
         self._sr = sr
@@ -40,11 +38,11 @@ class Yin():
         normalized_diff = diff_func / normalization
         return normalized_diff
 
-    def predict(self, x):
+    def predict(self, x, threshold=0.15):
         normalized_diff = self._normalized_difference(x)
         candidates = normalized_diff[self._tau_range[0]:self._tau_range[1]]
 
-        ideal_candidates = candidates <= self.THRESHOLD
+        ideal_candidates = candidates <= threshold
 
         if np.any(ideal_candidates):
             best_idx = np.argmax(ideal_candidates)
